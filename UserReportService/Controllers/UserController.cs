@@ -4,6 +4,8 @@ using UserReportService.Data;
 using UserReportService.Models;
 using UserReportService.DTOs;
 using System;
+using System.Linq;
+using System.Security.Claims;
 
 namespace UserReportService.Controllers
 {
@@ -259,7 +261,7 @@ namespace UserReportService.Controllers
             }
         }
 
-        // ✅ Khóa tài khoản
+        // ✅ KHÓA TÀI KHOẢN
         [HttpPost("{id}/lock")]
         [Authorize(Roles = "Admin")]
         public IActionResult LockUser(int id)
@@ -275,7 +277,7 @@ namespace UserReportService.Controllers
             return Ok(new { message = "Tài khoản đã bị khóa" });
         }
 
-        // ✅ Mở khóa tài khoản
+        // ✅ MỞ KHÓA TÀI KHOẢN
         [HttpPost("{id}/unlock")]
         [Authorize(Roles = "Admin")]
         public IActionResult UnlockUser(int id)
@@ -291,7 +293,7 @@ namespace UserReportService.Controllers
             return Ok(new { message = "Tài khoản đã được mở khóa" });
         }
 
-        // ✅ Xóa mềm (chuyển vào thùng rác)
+        // ✅ XÓA MỀM (chuyển vào thùng rác)
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public IActionResult SoftDelete(int id)
@@ -323,7 +325,7 @@ namespace UserReportService.Controllers
             return Ok(new { message = "User đã được khôi phục thành công" });
         }
 
-        // ✅ Xóa cứng (xóa vĩnh viễn khỏi database)
+        // ✅ XÓA CỨNG (xóa vĩnh viễn khỏi database)
         [HttpDelete("{id}/permanent")]
         [Authorize(Roles = "Admin")]
         public IActionResult PermanentDelete(int id)
@@ -338,7 +340,7 @@ namespace UserReportService.Controllers
             return Ok(new { message = "User đã bị xóa vĩnh viễn" });
         }
 
-        // ✅ Khôi phục tất cả user trong thùng rác
+        // ✅ KHÔI PHỤC TẤT CẢ user trong thùng rác
         [HttpPost("restore-all")]
         [Authorize(Roles = "Admin")]
         public IActionResult RestoreAll()
@@ -354,7 +356,7 @@ namespace UserReportService.Controllers
             return Ok(new { message = $"Đã khôi phục {deletedUsers.Count} user" });
         }
 
-        // ✅ Xóa tất cả user trong thùng rác vĩnh viễn
+        // ✅ XÓA TẤT CẢ user trong thùng rác vĩnh viễn
         [HttpDelete("empty-trash")]
         [Authorize(Roles = "Admin")]
         public IActionResult EmptyTrash()
@@ -364,6 +366,63 @@ namespace UserReportService.Controllers
             _context.SaveChanges();
 
             return Ok(new { message = $"Đã xóa vĩnh viễn {deletedUsers.Count} user khỏi thùng rác" });
+        }
+
+        // ✅ ĐỔI MẬT KHẨU (CHO CHÍNH USER ĐANG ĐĂNG NHẬP)
+        [HttpPost("change-password")]
+        public IActionResult ChangePassword(ChangePasswordDTO dto)
+        {
+            try
+            {
+                // Lấy userId từ token
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null)
+                    return Unauthorized(new { message = "Không xác định được người dùng" });
+
+                var userId = int.Parse(userIdClaim.Value);
+                var user = _context.Users.FirstOrDefault(u => u.Id == userId && !u.IsDeleted);
+
+                if (user == null)
+                    return NotFound(new { message = "Không tìm thấy người dùng" });
+
+                // Kiểm tra mật khẩu cũ
+                if (user.Password != dto.OldPassword)
+                    return BadRequest(new { message = "Mật khẩu cũ không đúng!" });
+
+                // Kiểm tra mật khẩu mới
+                if (string.IsNullOrEmpty(dto.NewPassword) || dto.NewPassword.Length < 6)
+                    return BadRequest(new { message = "Mật khẩu mới phải có ít nhất 6 ký tự!" });
+
+                // Kiểm tra ký tự đặc biệt
+                if (!HasSpecialCharacter(dto.NewPassword))
+                    return BadRequest(new { message = "Mật khẩu mới phải chứa ít nhất 1 ký tự đặc biệt (@, #, $, %, !, &, *)!" });
+
+                // Kiểm tra mật khẩu mới và xác nhận
+                if (dto.NewPassword != dto.ConfirmNewPassword)
+                    return BadRequest(new { message = "Mật khẩu xác nhận không khớp!" });
+
+                // Kiểm tra mật khẩu mới không trùng mật khẩu cũ
+                if (dto.OldPassword == dto.NewPassword)
+                    return BadRequest(new { message = "Mật khẩu mới không được trùng với mật khẩu cũ!" });
+
+                // Cập nhật mật khẩu
+                user.Password = dto.NewPassword;
+                user.UpdatedAt = DateTime.Now;
+                _context.SaveChanges();
+
+                return Ok(new { message = "Đổi mật khẩu thành công!" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        // Hàm kiểm tra ký tự đặc biệt
+        private bool HasSpecialCharacter(string password)
+        {
+            string specialChars = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+            return password.Any(c => specialChars.Contains(c));
         }
     }
 }

@@ -4,6 +4,7 @@ using UserReportService.Models;
 using UserReportService.Services;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Linq;
 
 namespace UserReportService.Controllers
 {
@@ -67,6 +68,13 @@ namespace UserReportService.Controllers
             }
         }
 
+        // ✅ Hàm kiểm tra ký tự đặc biệt
+        private bool HasSpecialCharacter(string password)
+        {
+            string specialChars = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+            return password.Any(c => specialChars.Contains(c));
+        }
+
         [HttpPost("register")]
         public IActionResult Register(RegisterDTO dto)
         {
@@ -83,17 +91,25 @@ namespace UserReportService.Controllers
                     return BadRequest(new { message = "Tên đăng nhập đã tồn tại!" });
                 }
 
-                // Kiểm tra mật khẩu
+                // Kiểm tra mật khẩu xác nhận
                 if (dto.Password != dto.ConfirmPassword)
                 {
                     return BadRequest(new { message = "Mật khẩu xác nhận không khớp!" });
                 }
 
+                // Kiểm tra độ dài mật khẩu
                 if (string.IsNullOrEmpty(dto.Password) || dto.Password.Length < 6)
                 {
                     return BadRequest(new { message = "Mật khẩu phải có ít nhất 6 ký tự!" });
                 }
 
+                // ✅ KIỂM TRA KÝ TỰ ĐẶC BIỆT
+                if (!HasSpecialCharacter(dto.Password))
+                {
+                    return BadRequest(new { message = "Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (@, #, $, %, !, &, *, etc.)!" });
+                }
+
+                // Kiểm tra họ tên
                 if (string.IsNullOrEmpty(dto.FullName))
                 {
                     return BadRequest(new { message = "Vui lòng nhập họ tên!" });
@@ -143,7 +159,6 @@ namespace UserReportService.Controllers
             }
             catch (DbUpdateException dbEx)
             {
-                // Lỗi database (thiếu cột, sai kiểu dữ liệu)
                 Console.WriteLine($"DB Error: {dbEx.InnerException?.Message ?? dbEx.Message}");
                 return StatusCode(500, new { message = "Lỗi database: " + (dbEx.InnerException?.Message ?? dbEx.Message) });
             }
