@@ -1,10 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using UserReportService.Data;
 using UserReportService.Models;
 using UserReportService.Services;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
+using System.Security.Claims;
 
 namespace UserReportService.Controllers
 {
@@ -40,9 +42,10 @@ namespace UserReportService.Controllers
                     return Unauthorized(new { message = "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ Admin!" });
                 }
 
+                // ✅ Kiểm tra tài khoản bị khóa
                 if (user.IsLocked)
                 {
-                    return Unauthorized(new { message = "Tài khoản đã bị khóa. Vui lòng liên hệ Admin!" });
+                    return Unauthorized(new { message = "Tài khoản đã bị khóa. Vui lòng liên hệ Admin để mở khóa!" });
                 }
 
                 user.LastLoginAt = DateTime.Now;
@@ -53,12 +56,14 @@ namespace UserReportService.Controllers
 
                 var token = _tokenService.GenerateToken(user);
 
+                // ✅ Thêm flag requirePasswordChange vào response
                 return Ok(new
                 {
                     token = token,
                     role = user.Role,
                     fullName = user.FullName,
-                    userId = user.Id
+                    userId = user.Id,
+                    requirePasswordChange = user.RequirePasswordChange // Flag yêu cầu đổi mật khẩu
                 });
             }
             catch (Exception ex)
@@ -68,11 +73,179 @@ namespace UserReportService.Controllers
             }
         }
 
-        // ✅ Hàm kiểm tra ký tự đặc biệt
-        private bool HasSpecialCharacter(string password)
+        // ✅ API đổi mật khẩu bắt buộc (dành cho lần đăng nhập đầu tiên)
+        [HttpPost("force-change-password")]
+        [Authorize]
+        public IActionResult ForceChangePassword(ForceChangePasswordDTO dto)
         {
-            string specialChars = "!@#$%^&*()_+-=[]{}|;:,.<>?";
-            return password.Any(c => specialChars.Contains(c));
+            try
+            {
+                // Lấy userId từ token
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null)
+                {
+                    return Unauthorized(new { message = "Không tìm thấy thông tin người dùng!" });
+                }
+
+                var userId = int.Parse(userIdClaim.Value);
+                var user = _context.Users.Find(userId);
+
+                if (user == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy người dùng!" });
+                }
+
+                // Kiểm tra mật khẩu mới
+                if (string.IsNullOrEmpty(dto.NewPassword) || dto.NewPassword.Length < 6)
+                {
+                    return BadRequest(new { message = "Mật khẩu phải có ít nhất 6 ký tự!" });
+                }
+
+                if (!HasSpecialCharacter(dto.NewPassword))
+                {
+                    return BadRequest(new { message = "Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (@, #, $, %, !, &, *, etc.)!" });
+                }
+
+                // ✅ Cập nhật mật khẩu và xóa flag yêu cầu đổi mật khẩu
+                user.Password = dto.NewPassword;
+                user.RequirePasswordChange = false;
+                user.UpdatedAt = DateTime.Now;
+                _context.SaveChanges();
+
+                return Ok(new { message = "Đổi mật khẩu thành công!" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ForceChangePassword error: {ex.Message}");
+                return StatusCode(500, new { message = "Lỗi server: " + ex.Message });
+            }
+        }
+
+        // ✅ API đổi mật khẩu thông thường (dành cho người dùng đã đăng nhập)
+        [HttpPost("change-password")]
+        [Authorize]
+        public IActionResult ChangePassword(ChangePasswordDTO dto)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null)
+                {
+                    return Unauthorized(new { message = "Không tìm thấy thông tin người dùng!" });
+                }
+
+                var userId = int.Parse(userIdClaim.Value);
+                var user = _context.Users.Find(userId);
+
+                if (user == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy người dùng!" });
+                }
+
+                // Kiểm tra mật khẩu cũ
+                if (user.Password != dto.OldPassword)
+                {
+                    return BadRequest(new { message = "Mật khẩu cũ không chính xác!" });
+                }
+
+                // Kiểm tra mật khẩu mới
+                if (string.IsNullOrEmpty(dto.NewPassword) || dto.NewPassword.Length < 6)
+                {
+                    return BadRequest(new { message = "Mật khẩu phải có ít nhất 6 ký tự!" });
+                }
+
+                if (!HasSpecialCharacter(dto.NewPassword))
+                {
+                    return BadRequest(new { message = "Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (@, #, $, %, !, &, *, etc.)!" });
+                }
+
+                // Cập nhật mật khẩu
+                user.Password = dto.NewPassword;
+                user.UpdatedAt = DateTime.Now;
+                _context.SaveChanges();
+
+                return Ok(new { message = "Đổi mật khẩu thành công!" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ChangePassword error: {ex.Message}");
+                return StatusCode(500, new { message = "Lỗi server: " + ex.Message });
+            }
+        }
+
+        // ✅ API khóa tài khoản
+        [HttpPost("lock/{id}")]
+        [Authorize]
+        public IActionResult LockUser(int id)
+        {
+            try
+            {
+                // Kiểm tra quyền admin
+                var currentUserRole = User.FindFirst(ClaimTypes.Role)?.Value;
+                if (currentUserRole != "Admin")
+                {
+                    return Forbid("Chỉ Admin mới có quyền khóa tài khoản!");
+                }
+
+                var user = _context.Users.Find(id);
+                if (user == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy người dùng!" });
+                }
+
+                if (user.IsLocked)
+                {
+                    return BadRequest(new { message = "Tài khoản đã bị khóa!" });
+                }
+
+                user.IsLocked = true;
+                user.UpdatedAt = DateTime.Now;
+                _context.SaveChanges();
+
+                return Ok(new { message = $"Đã khóa tài khoản {user.Username}!" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"LockUser error: {ex.Message}");
+                return StatusCode(500, new { message = "Lỗi server: " + ex.Message });
+            }
+        }
+
+        // ✅ API mở khóa tài khoản
+        [HttpPost("unlock/{id}")]
+        [Authorize]
+        public IActionResult UnlockUser(int id)
+        {
+            try
+            {
+                var currentUserRole = User.FindFirst(ClaimTypes.Role)?.Value;
+                if (currentUserRole != "Admin")
+                {
+                    return Forbid("Chỉ Admin mới có quyền mở khóa tài khoản!");
+                }
+
+                var user = _context.Users.Find(id);
+                if (user == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy người dùng!" });
+                }
+
+                if (!user.IsLocked)
+                {
+                    return BadRequest(new { message = "Tài khoản chưa bị khóa!" });
+                }
+
+                user.IsLocked = false;
+                user.UpdatedAt = DateTime.Now;
+                _context.SaveChanges();
+
+                return Ok(new { message = $"Đã mở khóa tài khoản {user.Username}!" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"UnlockUser error: {ex.Message}");
+                return StatusCode(500, new { message = "Lỗi server: " + ex.Message });
+            }
         }
 
         [HttpPost("register")]
@@ -136,6 +309,7 @@ namespace UserReportService.Controllers
                     Role = "User",
                     IsDeleted = false,
                     IsLocked = false,
+                    RequirePasswordChange = false, // ✅ Mặc định false cho đăng ký thông thường
                     CreatedAt = DateTime.Now,
                     LoginCount = 0
                 };
@@ -168,6 +342,13 @@ namespace UserReportService.Controllers
                 return StatusCode(500, new { message = "Lỗi server: " + ex.Message });
             }
         }
+
+        // ✅ Hàm kiểm tra ký tự đặc biệt
+        private bool HasSpecialCharacter(string password)
+        {
+            string specialChars = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+            return password.Any(c => specialChars.Contains(c));
+        }
     }
 
     public class LoginDTO
@@ -184,5 +365,18 @@ namespace UserReportService.Controllers
         public string FullName { get; set; }
         public string Email { get; set; }
         public string Phone { get; set; }
+    }
+
+    // ✅ Thêm các DTO mới
+    public class ForceChangePasswordDTO
+    {
+        public string NewPassword { get; set; }
+    }
+
+    public class ChangePasswordDTO
+    {
+        public string OldPassword { get; set; }
+        public string NewPassword { get; set; }
+        public string ConfirmNewPassword { get; internal set; }
     }
 }

@@ -38,6 +38,7 @@ namespace UserReportService.Controllers
                     Avatar = u.Avatar,
                     Role = u.Role,
                     IsLocked = u.IsLocked,
+                    RequirePasswordChange = u.RequirePasswordChange, // ✅ THÊM
                     CreatedAt = u.CreatedAt,
                     LastLoginAt = u.LastLoginAt,
                     LoginCount = u.LoginCount
@@ -63,6 +64,7 @@ namespace UserReportService.Controllers
                     Avatar = u.Avatar,
                     Role = u.Role,
                     IsLocked = u.IsLocked,
+                    RequirePasswordChange = u.RequirePasswordChange, // ✅ THÊM
                     CreatedAt = u.CreatedAt,
                     DeletedAt = u.DeletedAt
                 }).ToList();
@@ -95,6 +97,7 @@ namespace UserReportService.Controllers
                     Avatar = u.Avatar,
                     Role = u.Role,
                     IsLocked = u.IsLocked,
+                    RequirePasswordChange = u.RequirePasswordChange, // ✅ THÊM
                     CreatedAt = u.CreatedAt,
                     LastLoginAt = u.LastLoginAt,
                     LoginCount = u.LoginCount
@@ -120,6 +123,7 @@ namespace UserReportService.Controllers
                     Avatar = u.Avatar,
                     Role = u.Role,
                     IsLocked = u.IsLocked,
+                    RequirePasswordChange = u.RequirePasswordChange, // ✅ THÊM
                     CreatedAt = u.CreatedAt,
                     LastLoginAt = u.LastLoginAt,
                     LoginCount = u.LoginCount
@@ -164,6 +168,7 @@ namespace UserReportService.Controllers
                 Avatar = user.Avatar,
                 Role = user.Role,
                 IsLocked = user.IsLocked,
+                RequirePasswordChange = user.RequirePasswordChange, // ✅ THÊM
                 CreatedAt = user.CreatedAt,
                 LastLoginAt = user.LastLoginAt,
                 LoginCount = user.LoginCount
@@ -189,6 +194,7 @@ namespace UserReportService.Controllers
                 Role = dto.Role,
                 IsDeleted = false,
                 IsLocked = false,
+                RequirePasswordChange = true, // ✅ THÊM - BẮT BUỘC YÊU CẦU ĐỔI MẬT KHẨU
                 CreatedAt = DateTime.Now,
                 LoginCount = 0
             };
@@ -206,6 +212,7 @@ namespace UserReportService.Controllers
                 Avatar = user.Avatar,
                 Role = user.Role,
                 IsLocked = user.IsLocked,
+                RequirePasswordChange = user.RequirePasswordChange, // ✅ THÊM
                 CreatedAt = user.CreatedAt
             });
         }
@@ -251,6 +258,7 @@ namespace UserReportService.Controllers
                     Avatar = user.Avatar,
                     Role = user.Role,
                     IsLocked = user.IsLocked,
+                    RequirePasswordChange = user.RequirePasswordChange, // ✅ THÊM
                     CreatedAt = user.CreatedAt,
                     UpdatedAt = user.UpdatedAt
                 });

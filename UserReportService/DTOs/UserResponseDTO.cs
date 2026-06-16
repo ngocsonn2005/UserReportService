@@ -12,6 +12,7 @@ namespace UserReportService.DTOs
         public string Avatar { get; set; }
         public string Role { get; set; }
         public bool IsLocked { get; set; }
+        public bool RequirePasswordChange { get; set; }
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public DateTime? DeletedAt { get; set; }

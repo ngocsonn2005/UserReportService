@@ -1,4 +1,5 @@
-﻿namespace UserReportService.DTOs
+﻿using System;
+namespace UserReportService.DTOs
 {
     public class ChangePasswordDTO
     {

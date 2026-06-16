@@ -31,6 +31,7 @@ namespace UserReportService.Models
         public bool IsLocked { get; set; } = false;
 
         public DateTime? LockedAt { get; set; }
+        public bool RequirePasswordChange { get; set; }
 
         public DateTime? LastLoginAt { get; set; }  // ✅ Lần đăng nhập cuối
 
