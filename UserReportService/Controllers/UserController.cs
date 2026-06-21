@@ -432,5 +432,34 @@ namespace UserReportService.Controllers
             string specialChars = "!@#$%^&*()_+-=[]{}|;:,.<>?";
             return password.Any(c => specialChars.Contains(c));
         }
+        // ✅ KIỂM TRA TRẠNG THÁI TÀI KHOẢN (cho frontend polling)
+        [HttpGet("check-status")]
+        [Authorize]
+        public IActionResult CheckStatus()
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null)
+                    return Unauthorized(new { message = "Không xác định được người dùng" });
+
+                var userId = int.Parse(userIdClaim.Value);
+                var user = _context.Users.FirstOrDefault(u => u.Id == userId && !u.IsDeleted);
+
+                if (user == null)
+                    return NotFound(new { message = "Không tìm thấy người dùng" });
+
+                return Ok(new
+                {
+                    isLocked = user.IsLocked,
+                    isDeleted = user.IsDeleted,
+                    message = user.IsLocked ? "Tài khoản đã bị khóa" : null
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
     }
 }

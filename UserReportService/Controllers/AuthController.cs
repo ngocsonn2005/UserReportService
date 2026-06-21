@@ -45,7 +45,11 @@ namespace UserReportService.Controllers
                 // ✅ Kiểm tra tài khoản bị khóa
                 if (user.IsLocked)
                 {
-                    return Unauthorized(new { message = "Tài khoản đã bị khóa. Vui lòng liên hệ Admin để mở khóa!" });
+                    return Unauthorized(new
+                    {
+                        message = "Tài khoản đã bị khóa. Vui lòng liên hệ Admin để mở khóa!",
+                        isLocked = true // ✅ Thêm dòng này
+                    });
                 }
 
                 user.LastLoginAt = DateTime.Now;

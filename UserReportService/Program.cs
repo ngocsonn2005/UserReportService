@@ -4,19 +4,24 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using UserReportService.Data;
 using UserReportService.Services;
+using UserReportService.Filters; // ✅ Thêm dòng này
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ✅ Cho phép kết nối từ mọi IP (quan trọng!)
+// ✅ Cho phép kết nối từ mọi IP
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
 // Add services to container
-builder.Services.AddControllers()
-    .ConfigureApiBehaviorOptions(options =>
-    {
-        // Tắt tự động trả về 400 cho validation errors
-        options.SuppressModelStateInvalidFilter = true;
-    });
+builder.Services.AddControllers(options =>
+{
+    // ✅ Thêm global filter kiểm tra khóa tài khoản
+    options.Filters.Add<LockCheckFilter>();
+})
+.ConfigureApiBehaviorOptions(options =>
+{
+    options.SuppressModelStateInvalidFilter = true;
+});
+
 builder.Services.AddEndpointsApiExplorer();
 
 // Cấu hình Swagger với JWT
